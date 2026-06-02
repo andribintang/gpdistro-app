@@ -1,0 +1,149 @@
+// Prisma schema — SQLite untuk dev lokal.
+// Ganti provider ke "postgresql" saat produksi.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  emoji    String    @default("👕")
+  products Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  emoji       String   @default("👕")
+  basePrice   Int      // rupiah penuh
+  oldPrice    Int?     // harga coret (opsional)
+  material    String   @default("Cotton Combed 24s")
+  fit         String   @default("Regular")
+  weightGram  Int      @default(250)
+  isBestSeller Boolean @default(false)
+  isNew       Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  sizes      ProductSize[]
+  images     ProductImage[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+}
+
+// Galeri foto produk (urut by `order`, foto pertama = utama).
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String  @default("")
+  order     Int     @default(0)
+
+  @@index([productId])
+}
+
+// Varian ukuran + stok per ukuran (mis. S / M / L / XL atau 30 / 32 / All Size)
+model ProductSize {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label     String  // "S", "M", "L", "XL", "32", "All Size"
+  stock     Int     @default(0)
+  order     Int     @default(0) // urutan tampil
+
+  @@unique([productId, label])
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id])
+  customerName String
+  email        String
+  phone        String
+  address      String
+  total        Int
+  shippingCost   Int      @default(0)
+  shippingCourier String?
+  shippingService String?
+  status       String      @default("PENDING") // PENDING / PAID / SHIPPED / DONE / CANCELLED
+  paymentRef   String?     // Fase 2 (Midtrans)
+  createdAt    DateTime    @default(now())
+  items        OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  name      String  // snapshot nama
+  size      String  // snapshot ukuran
+  price     Int     // snapshot harga
+  quantity  Int     @default(1)
+}
+
+// Pengaturan toko (key-value). Mis. key="theme" → "streetwear" / "clean".
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+// Akun pelanggan
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  phone        String    @default("")
+  address      String    @default("")
+  createdAt    DateTime  @default(now())
+  orders       Order[]
+  sessions     Session[]
+  addresses    Address[]
+}
+
+// Alamat pengiriman tersimpan milik pelanggan
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String   @default("Rumah")
+  recipient String
+  phone     String
+  address   String
+  postalCode String  @default("")
+  cityId    String   @default("")
+  cityLabel String   @default("")
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

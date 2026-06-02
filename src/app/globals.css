@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- TEMA: STREETWEAR (default) ---------- */
+:root {
+  --c-bg: 12 12 14;
+  --c-surface: 22 22 28;
+  --c-surface2: 29 29 37;
+  --c-line: 42 42 51;
+  --c-bone: 244 242 236;
+  --c-muted: 143 143 153;
+  --c-volt: 198 255 58;
+  --c-volt-dark: 166 224 0;
+
+  --ui-sans: var(--font-archivo);
+  --ui-disp: var(--font-anton);
+  --disp-transform: uppercase;
+  --disp-tracking: 0.01em;
+  --disp-leading: 0.95;
+}
+
+/* ---------- TEMA: CLEAN (ala Maujual) ---------- */
+[data-theme="clean"] {
+  --c-bg: 255 255 255;
+  --c-surface: 255 255 255;
+  --c-surface2: 246 244 238;
+  --c-line: 230 226 216;
+  --c-bone: 12 26 23;
+  --c-muted: 93 107 102;
+  --c-volt: 10 125 110;
+  --c-volt-dark: 6 92 80;
+
+  --ui-sans: var(--font-jakarta);
+  --ui-disp: var(--font-sora);
+  --disp-transform: none;
+  --disp-tracking: -0.02em;
+  --disp-leading: 1.08;
+}
+
+html { scroll-behavior: smooth; }
+
+body { @apply bg-bg text-bone antialiased; }
+
+::selection { background: rgb(var(--c-volt)); color: rgb(var(--c-bg)); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* heading display — gaya mengikuti tema aktif */
+.disp {
+  font-family: var(--ui-disp), Impact, sans-serif;
+  text-transform: var(--disp-transform);
+  letter-spacing: var(--disp-tracking);
+  line-height: var(--disp-leading);
+}
