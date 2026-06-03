@@ -1,15 +1,16 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { totalStock } from "@/lib/types";
 import ProductsTable, { type AdminProductRow } from "@/components/admin/ProductsTable";
+import ImportProducts from "@/components/admin/ImportProducts";
+import { PageHeader, PrimaryLink, StatCard } from "@/components/admin/ui/kit";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminProducts() {
-  const products = await prisma.product.findMany({
-    include: { category: true, sizes: true, images: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [products, cats] = await Promise.all([
+    prisma.product.findMany({ include: { category: true, sizes: true, images: true }, orderBy: { createdAt: "desc" } }),
+    prisma.category.findMany({ orderBy: { name: "asc" } }),
+  ]);
 
   const rows: AdminProductRow[] = products.map((p) => ({
     id: p.id,
@@ -18,6 +19,7 @@ export default async function AdminProducts() {
     image: p.images.slice().sort((a, b) => a.order - b.order)[0]?.url ?? null,
     emoji: p.emoji,
     basePrice: p.basePrice,
+    costPrice: p.costPrice,
     oldPrice: p.oldPrice,
     stock: totalStock(p.sizes.map((s) => ({ label: s.label, stock: s.stock }))),
     sizes: p.sizes.slice().sort((a, b) => a.order - b.order).map((s) => s.label),
@@ -26,35 +28,24 @@ export default async function AdminProducts() {
     isNew: p.isNew,
   }));
 
-  const categories = [...new Set(rows.map((r) => r.category))];
-  const activeCount = rows.filter((r) => r.active).length;
-  const lowStock = rows.filter((r) => r.stock <= 5).length;
-
+  const categories = cats.map((c) => ({ id: c.id, name: c.name }));
   const stats = [
-    ["Total produk", String(products.length)],
-    ["Aktif", String(activeCount)],
-    ["Stok menipis", String(lowStock)],
-    ["Kategori", String(categories.length)],
+    { label: "Total produk", value: String(products.length), icon: "📦" },
+    { label: "Aktif", value: String(rows.filter((r) => r.active).length), icon: "✅", accent: true },
+    { label: "Stok menipis", value: String(rows.filter((r) => r.stock <= 5).length), icon: "⚠️" },
+    { label: "Kategori", value: String(categories.length), icon: "🏷️" },
   ];
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="disp text-3xl text-bone">Produk</h1>
-          <p className="mt-1 text-sm text-muted">Kelola katalog, stok, dan foto produk.</p>
-        </div>
-        <Link href="/admin/products/new" className="rounded-full bg-volt px-5 py-2.5 text-[13px] font-extrabold uppercase tracking-wide text-bg transition hover:bg-volt-dark">+ Produk Baru</Link>
-      </div>
+      <PageHeader title="Produk" subtitle="Kelola katalog, stok, dan foto produk."
+        action={<PrimaryLink href="/admin/products/new">+ Produk Baru</PrimaryLink>} />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map(([label, val]) => (
-          <div key={label} className="rounded-2xl border border-line bg-surface p-4">
-            <div className="text-[11.5px] uppercase tracking-wide text-muted">{label}</div>
-            <div className="disp mt-1 text-2xl text-bone">{val}</div>
-          </div>
-        ))}
+        {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
+
+      <div className="mb-6"><ImportProducts /></div>
 
       <ProductsTable products={rows} categories={categories} />
     </div>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_COOKIE, ADMIN_TOKEN, ADMIN_PASSWORD } from "@/lib/auth";
+import { applyOrderStatus } from "@/lib/orders";
 
 export type SizeInput = { label: string; stock: number };
 export type ImageInput = { url: string; alt: string };
@@ -13,6 +14,7 @@ export type ProductInput = {
   slug: string;
   categoryId: string;
   basePrice: number;
+  costPrice: number;
   oldPrice: number | null;
   material: string;
   fit: string;
@@ -55,7 +57,7 @@ export async function createProduct(data: ProductInput) {
   await prisma.product.create({
     data: {
       slug, name: data.name, description: data.description, emoji: data.emoji || "👕",
-      basePrice: data.basePrice, oldPrice: data.oldPrice,
+      basePrice: data.basePrice, costPrice: data.costPrice, oldPrice: data.oldPrice,
       material: data.material, fit: data.fit, weightGram: data.weightGram,
       isBestSeller: data.isBestSeller, isNew: data.isNew, isActive: data.isActive,
       categoryId: data.categoryId,
@@ -77,7 +79,7 @@ export async function updateProduct(id: string, data: ProductInput) {
     where: { id },
     data: {
       slug, name: data.name, description: data.description, emoji: data.emoji || "👕",
-      basePrice: data.basePrice, oldPrice: data.oldPrice,
+      basePrice: data.basePrice, costPrice: data.costPrice, oldPrice: data.oldPrice,
       material: data.material, fit: data.fit, weightGram: data.weightGram,
       isBestSeller: data.isBestSeller, isNew: data.isNew, isActive: data.isActive,
       categoryId: data.categoryId,
@@ -107,6 +109,79 @@ export async function deleteProduct(id: string) {
 export async function setOrderStatus(id: string, status: string) {
   await prisma.order.update({ where: { id }, data: { status } });
   revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+}
+
+// Terima pembayaran manual (PENDING -> PAID)
+export async function confirmPayment(id: string) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order || order.status !== "PENDING") return;
+  await prisma.order.update({ where: { id }, data: { status: "PAID", paidAt: new Date() } });
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+}
+
+// Proses pengiriman + input resi (PAID -> SHIPPED)
+export async function shipOrder(id: string, formData: FormData) {
+  const trackingNumber = String(formData.get("trackingNumber") ?? "").trim();
+  if (!trackingNumber) return;
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order || order.status !== "PAID") return;
+  await prisma.order.update({
+    where: { id },
+    data: { status: "SHIPPED", trackingNumber, shippedAt: new Date() },
+  });
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+  revalidatePath(`/order/${id}`);
+}
+
+// Selesai (SHIPPED -> DONE)
+export async function completeOrder(id: string) {
+  await prisma.order.update({ where: { id }, data: { status: "DONE" } });
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+}
+
+// Batalkan + kembalikan stok
+export async function cancelOrder(id: string) {
+  const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
+  if (!order || order.status === "CANCELLED" || order.status === "DONE") return;
+  await applyOrderStatus(order.id, "CANCELLED");
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${id}`);
+}
+
+// ---------- BULK PRODUK ----------
+export async function bulkUpdateProducts(ids: string[], patch: { categoryId?: string; isActive?: boolean }) {
+  if (!ids.length) return;
+  const data: { categoryId?: string; isActive?: boolean } = {};
+  if (patch.categoryId) data.categoryId = patch.categoryId;
+  if (typeof patch.isActive === "boolean") data.isActive = patch.isActive;
+  if (Object.keys(data).length === 0) return;
+  await prisma.product.updateMany({ where: { id: { in: ids } }, data });
+  revalidatePath("/admin/products");
+  revalidatePath("/");
+}
+
+export async function bulkDeleteProducts(ids: string[]) {
+  if (!ids.length) return;
+  // produk yang sudah ada di order -> nonaktifkan; sisanya -> hapus
+  const used = await prisma.orderItem.findMany({
+    where: { productId: { in: ids } }, select: { productId: true }, distinct: ["productId"],
+  });
+  const usedIds = new Set(used.map((u) => u.productId));
+  const deletable = ids.filter((id) => !usedIds.has(id));
+  const deactivate = ids.filter((id) => usedIds.has(id));
+
+  if (deactivate.length) await prisma.product.updateMany({ where: { id: { in: deactivate } }, data: { isActive: false } });
+  if (deletable.length) {
+    await prisma.productSize.deleteMany({ where: { productId: { in: deletable } } });
+    await prisma.productImage.deleteMany({ where: { productId: { in: deletable } } });
+    await prisma.product.deleteMany({ where: { id: { in: deletable } } });
+  }
+  revalidatePath("/admin/products");
+  revalidatePath("/");
 }
 
 // ---------- APPEARANCE ----------

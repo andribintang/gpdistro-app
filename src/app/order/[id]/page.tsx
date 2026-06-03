@@ -45,6 +45,13 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             <PayButton orderId={order.id} />
           </div>
         )}
+
+        {order.trackingNumber && (
+          <div className="mx-auto mt-5 inline-block rounded-xl border border-line bg-surface px-4 py-2.5 text-sm">
+            No. Resi: <span className="font-mono font-bold text-bone">{order.trackingNumber}</span>
+            {order.shippingCourier && <span className="text-muted"> · {order.shippingCourier}</span>}
+          </div>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl border border-line bg-surface p-6">

@@ -24,7 +24,8 @@ model Product {
   name        String
   description String   @default("")
   emoji       String   @default("👕")
-  basePrice   Int      // rupiah penuh
+  basePrice   Int      // rupiah penuh (harga jual)
+  costPrice   Int      @default(0) // harga beli/modal (internal)
   oldPrice    Int?     // harga coret (opsional)
   material    String   @default("Cotton Combed 24s")
   fit         String   @default("Regular")
@@ -81,6 +82,9 @@ model Order {
   shippingCourier String?
   shippingService String?
   status       String      @default("PENDING") // PENDING / PAID / SHIPPED / DONE / CANCELLED
+  trackingNumber String?   // nomor resi pengiriman
+  paidAt       DateTime?
+  shippedAt    DateTime?
   paymentRef   String?     // Fase 2 (Midtrans)
   createdAt    DateTime    @default(now())
   items        OrderItem[]

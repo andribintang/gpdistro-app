@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCategories } from "@/lib/products";
 import { updateProduct, type ProductInput } from "@/app/admin/actions";
 import ProductForm from "@/components/ProductForm";
+import { PageHeader } from "@/components/admin/ui/kit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function EditProduct({ params }: { params: { id: string } }
     slug: product.slug,
     categoryId: product.categoryId,
     basePrice: product.basePrice,
+    costPrice: product.costPrice,
     oldPrice: product.oldPrice,
     material: product.material,
     fit: product.fit,
@@ -42,7 +44,7 @@ export default async function EditProduct({ params }: { params: { id: string } }
 
   return (
     <div>
-      <h1 className="disp mb-7 text-3xl text-bone">Edit Produk</h1>
+      <PageHeader title="Edit Produk" subtitle="Perbarui detail produk." />
       <ProductForm categories={categories} initial={initial} action={action} submitLabel="Simpan Perubahan" />
     </div>
   );
